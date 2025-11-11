@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>RegOps Console</title>
+  <style>
+    body { font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 20px; max-width: 980px; margin: auto; }
+    h2 { margin-top: 28px; }
+    button { padding: 8px 12px; margin-right: 8px; }
+    input, textarea { width: 100%; padding: 8px; }
+    .row { display: flex; gap: 12px; align-items: center; }
+    .card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin: 10px 0; }
+    pre { background: #f7f7f7; padding: 12px; border-radius: 8px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>RegOps Copilot</h1>
+
+  <div class="card">
+    <h2>1) Ingest SOP</h2>
+    <div class="row">
+      <input type="file" id="file" />
+      <button id="ingest">Upload</button>
+      <a href="/docs" target="_blank">Open /docs</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2) Ask RAG</h2>
+    <input id="q" placeholder="e.g., required email content for stability pulls" />
+    <button id="ask">Ask</button>
+  </div>
+
+  <div class="card">
+    <h2>3) Run Agent</h2>
+    <input id="instr" value="prepare stability pull list for week 45" />
+    <button id="run">Run</button>
+    <button id="metrics">Metrics</button>
+    <button id="approve">Approve</button>
+    <button id="send">Send</button>
+  </div>
+
+  <div class="card">
+    <h2>4) RAG Eval</h2>
+    <textarea id="cases" rows="4">[{
+  "question": "required email content for stability pulls",
+  "ground": "Lot Batch Expiry Storage"
+}]</textarea>
+    <button id="eval">Run Eval</button>
+  </div>
+
+  <div class="card">
+    <h2>Output</h2>
+    <pre id="out">…</pre>
+  </div>
+
+<script>
+const out = document.getElementById('out');
+const show = (x) => out.textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2);
+let lastRunId = null;
+
+document.getElementById('ingest').onclick = async () => {
+  const f = document.getElementById('file').files[0];
+  if (!f) { show('Choose a file first.'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/ingest', { method: 'POST', body: fd });
+  show(await r.json());
+};
+
+document.getElementById('ask').onclick = async () => {
+  const q = document.getElementById('q').value || '';
+  const r = await fetch('/ask_rag', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ question: q, k: 5 }) });
+  show(await r.json());
+};
+
+document.getElementById('run').onclick = async () => {
+  const instruction = document.getElementById('instr').value || '';
+  let resp = await fetch('/agent/run', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ instruction })
+  });
+  const data = await resp.json();
+  // Render a compact timeline
+  const lines = [];
+  lines.push(`iterations: ${data.iter || 1}`);
+  (data.steps || []).forEach(s => {
+    if (s.error) lines.push(`✗ ${s.id} — ${s.action}: ${s.error}`);
+    else lines.push(`✓ ${s.id} — ${s.action}`);
+  });
+  lines.push(`review: ${data.review?.passed ? 'PASSED' : 'FAILED'}`);
+  show(lines.join('\n') + '\n\nFull:\n' + JSON.stringify(data, null, 2));
+};
+
+document.getElementById('metrics').onclick = async () => {
+  const r = await fetch('/metrics/summary');
+  show(await r.json());
+};
+
+document.getElementById('eval').onclick = async () => {
+  let cases;
+  try { cases = JSON.parse(document.getElementById('cases').value); }
+  catch { show('Cases JSON invalid'); return; }
+  const r = await fetch('/eval/rag', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cases }) });
+  show(await r.json());
+};
+
+async function getLastRunId() {
+  const r = await fetch('/audit/logs');
+  const data = await r.json();
+  const runs = (data.logs || []).filter(l => l.actor==="AGENT" && l.action==="run_graph");
+  if (!runs.length) return null;
+  // assuming logs have sequential ids
+  runs.sort((a,b)=> (a.id||0)-(b.id||0));
+  return String(runs[runs.length-1].id);
+}
+
+document.getElementById('run').onclick = async () => {
+  const instruction = document.getElementById('instr').value || '';
+  const resp = await fetch('/agent/run', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ instruction })
+  });
+  const data = await resp.json();
+  show(data);
+  lastRunId = await getLastRunId();
+};
+
+document.getElementById('approve').onclick = async () => {
+  const id = lastRunId || await getLastRunId();
+  if (!id) return show('No run to approve');
+  const r = await fetch('/agent/approve', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ run_id: id, approve: true })
+  });
+  show(await r.json());
+};
+
+document.getElementById('send').onclick = async () => {
+  const r = await fetch('/agent/send', { method:'POST' });
+  show(await r.json());
+};
+</script>
+</body>
+</html>

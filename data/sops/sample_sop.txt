@@ -1,0 +1,4 @@
+SOP-123: Stability Pulls
+Section 5.1: Weekly stability pulls must occur within ±3 days of the planned date.
+Section 5.2: Each pull requires a two-person review before samples leave storage.
+Section 6.0: Required email content includes Lot, Batch, Expiry, and Storage conditions.
