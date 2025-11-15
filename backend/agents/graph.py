@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from . import tool_exec, reviewer
 from .llm import plan_for
 from .toolspec import validate_action
+from backend.llm import get_manager
 
 MAX_ITERS = 3
 State = Dict[str, Any]  # simple state for legacy API
@@ -21,6 +22,15 @@ def node_plan(state: State) -> State:
         args = validate_action(action, step.get("args", {}))
         validated.append({"tool": action, "args": args})
     state["plan"] = validated
+    
+    # Capture which LLM provider was used for audit trail
+    try:
+        manager = get_manager()
+        state["llm_provider"] = manager.last_used_provider or "deterministic"
+    except Exception:
+        # If manager not available or error, mark as deterministic
+        state["llm_provider"] = "deterministic"
+    
     return state
 
 def node_exec(state: State) -> State:

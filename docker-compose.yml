@@ -4,8 +4,37 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Database Configuration
       PG_URL: postgresql+psycopg2://regops:regops@db:5432/regops
-      EMBEDDINGS_OFFLINE: "0"
+      COPILOT_DB: ${COPILOT_DB:-data/copilot.sqlite3}
+      EMBEDDINGS_OFFLINE: ${EMBEDDINGS_OFFLINE:-0}
+      
+      # LLM Provider Configuration
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      LLM_FALLBACK_CHAIN: ${LLM_FALLBACK_CHAIN:-gemini,openrouter,ollama}
+      
+      # Google Gemini Configuration
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      
+      # OpenRouter Configuration
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://localhost:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      
+      # Local LLM Configuration
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-local}
+      
+      # Retry and Timeout Configuration
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
+      LLM_RETRY_DELAY: ${LLM_RETRY_DELAY:-2.0}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+    env_file:
+      - .env
     depends_on:
       - db
 

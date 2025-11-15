@@ -90,7 +90,8 @@ def eval_rag_api(req: RagEvalReq):
 @app.post("/agent/run")
 def agent_run(req: AgentReq):
     out = GRAPH.invoke({"instruction": req.instruction})
-    db.add_audit("AGENT","run_graph",{"instruction": req.instruction, "review": out.get("review",{}), "iter": out.get("iter", 0)})
+    llm_provider = out.get("llm_provider", "deterministic")
+    db.add_audit("AGENT","run_graph",{"instruction": req.instruction, "review": out.get("review",{}), "iter": out.get("iter", 0)}, provider=llm_provider)
     return out
 
 @app.post("/agent/approve")
